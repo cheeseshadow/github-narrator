@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         GitHub Narrator
-// @namespace    https://github.com/cheeseshadow/github_narrator
+// @namespace    https://github.com/cheeseshadow/github-narrator
 // @version      0.1.0
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
