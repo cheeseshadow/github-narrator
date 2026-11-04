@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
-// @version      0.3.1
+// @version      0.3.2
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
 // @updateURL    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
@@ -30,16 +30,16 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    tr.narrate-dim > td { opacity: 0.4; }
-    tr.narrate-main > td { background-color: var(--bgColor-accent-muted, #ddf4ff) !important; }
-    tr.narrate-main > td:has(> code.addition) { background-color: color-mix(in srgb, var(--bgColor-accent-muted, #ddf4ff) 50%, var(--diffBlob-additionLine-bgColor, var(--diffBlob-addition-bgColor-line))) !important; }
-    tr.narrate-main > td:has(> code.deletion) { background-color: color-mix(in srgb, var(--bgColor-accent-muted, #ddf4ff) 50%, var(--diffBlob-deletionLine-bgColor, var(--diffBlob-deletion-bgColor-line))) !important; }
-    tr.narrate-main:has(code.addition) > td:not(.diff-text-cell) { background-color: color-mix(in srgb, var(--bgColor-accent-muted, #ddf4ff) 50%, var(--diffBlob-additionNum-bgColor, var(--diffBlob-addition-bgColor-num))) !important; }
-    tr.narrate-main:has(code.deletion) > td:not(.diff-text-cell) { background-color: color-mix(in srgb, var(--bgColor-accent-muted, #ddf4ff) 50%, var(--diffBlob-deletionNum-bgColor, var(--diffBlob-deletion-bgColor-num))) !important; }
-    tr.narrate-main > td:first-child { box-shadow: inset 4px 0 0 var(--fgColor-accent, #0969da); }
+    tr[data-narrate="dim"] > td { opacity: 0.4; }
+    tr[data-narrate="main"] > td { background-color: var(--bgColor-accent-muted, #ddf4ff) !important; }
+    tr[data-narrate="main"] > td:has(> code.addition) { background-color: color-mix(in srgb, var(--bgColor-accent-muted, #ddf4ff) 50%, var(--diffBlob-additionLine-bgColor, var(--diffBlob-addition-bgColor-line))) !important; }
+    tr[data-narrate="main"] > td:has(> code.deletion) { background-color: color-mix(in srgb, var(--bgColor-accent-muted, #ddf4ff) 50%, var(--diffBlob-deletionLine-bgColor, var(--diffBlob-deletion-bgColor-line))) !important; }
+    tr[data-narrate="main"]:has(code.addition) > td:not(.diff-text-cell) { background-color: color-mix(in srgb, var(--bgColor-accent-muted, #ddf4ff) 50%, var(--diffBlob-additionNum-bgColor, var(--diffBlob-addition-bgColor-num))) !important; }
+    tr[data-narrate="main"]:has(code.deletion) > td:not(.diff-text-cell) { background-color: color-mix(in srgb, var(--bgColor-accent-muted, #ddf4ff) 50%, var(--diffBlob-deletionNum-bgColor, var(--diffBlob-deletion-bgColor-num))) !important; }
+    tr[data-narrate="main"] > td:first-child { box-shadow: inset 4px 0 0 var(--fgColor-accent, #0969da); }
     tr.narrate-label.narrate-label-main > td { background: var(--bgColor-accent-muted, #ddf4ff); color: var(--fgColor-accent, #0969da); box-shadow: inset 4px 0 0 var(--fgColor-accent, #0969da); }
     tr.narrate-label.narrate-label-main > td > b { color: var(--fgColor-accent, #0969da); }
-    tr.narrate-hidden { display: none; }
+    tr[data-narrate-collapsed] { display: none; }
     tr.narrate-label > td {
       padding: 2px 12px;
       font: 12px var(--fontStack-sansSerif, sans-serif);
@@ -49,7 +49,7 @@
       user-select: none;
     }
     tr.narrate-label > td > b { color: var(--fgColor-default, #1f2328); margin-right: 6px; }
-    .narrate-thread-hidden { display: none !important; }
+    [data-narrate-thread-hidden] { display: none !important; }
   `;
   document.head.append(style);
 
@@ -107,25 +107,22 @@
 
   function setCollapsed(state, collapsed) {
     state.collapsed = collapsed;
-    state.rows.forEach((r) => r.classList.toggle('narrate-hidden', collapsed));
+    state.rows.forEach((r) => r.toggleAttribute('data-narrate-collapsed', collapsed));
   }
 
   function hideThread(thread) {
     const replies = thread.querySelectorAll('.markdown-body').length > 1;
     const wrapper = thread.closest('[data-inline-markers] > *') || thread;
-    wrapper.classList.toggle('narrate-thread-hidden', !replies);
+    wrapper.toggleAttribute('data-narrate-thread-hidden', !replies);
     const markers = thread.closest('[data-inline-markers]');
     if (!markers) return;
     const threadWrappers = [...markers.children].filter((c) => c.querySelector('[data-testid="review-thread"]'));
-    markers.classList.toggle('narrate-thread-hidden', threadWrappers.every((c) => c.classList.contains('narrate-thread-hidden')));
+    markers.toggleAttribute('data-narrate-thread-hidden', threadWrappers.every((c) => c.hasAttribute('data-narrate-thread-hidden')));
   }
 
   function render(thread, info, rows, collapsed, range) {
     const state = { label: document.createElement('tr'), rows, collapsed };
-    for (const r of rows) {
-      r.classList.toggle('narrate-dim', info.tag !== 'main');
-      r.classList.toggle('narrate-main', info.tag === 'main');
-    }
+    for (const r of rows) r.dataset.narrate = info.tag === 'main' ? 'main' : 'dim';
     setCollapsed(state, collapsed);
 
     state.label.className = `narrate-label narrate-label-${info.tag}`;
@@ -149,7 +146,10 @@
     delete thread[STATE];
     if (!state) return;
     state.label.remove();
-    state.rows.forEach((r) => r.classList.remove('narrate-dim', 'narrate-main', 'narrate-hidden'));
+    state.rows.forEach((r) => {
+      delete r.dataset.narrate;
+      r.removeAttribute('data-narrate-collapsed');
+    });
   }
 
   function takenByAnother(firstRow, thread) {
