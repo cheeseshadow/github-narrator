@@ -83,6 +83,19 @@ GitHub's page is a React application that re-creates rows, threads and their con
 - Every mark it puts on an element GitHub owns is a data attribute, never a class. React rewrites an element's whole class list whenever the classes it manages change, and the markers container gets a new class when a thread is focused. React leaves attributes it does not know about alone. The attributes are `data-narrate="main"` or `"dim"` and `data-narrate-collapsed` on rows, and `data-narrate-thread-hidden` on the thread wrapper and its container.
 - A file's rank is remembered for the rest of the page's life, keyed by pull request and file, because collapsing a file removes its rows and threads from the DOM and the file must keep its place.
 
+## Tooling for posting tags
+
+The repository ships the mechanics for posting tags and nothing about policy. What counts as the main change in a given codebase, and whether a tool may publish tags or must leave them as a draft, belongs to each organization or person, in their own instructions.
+
+`narrate.py` is a Python script that needs only the `gh` CLI. It has four commands:
+
+- `diff OWNER/REPO NUMBER` prints the diff with the old-side number `Lnn` and the new-side number `Rnn` in front of every line, so a tag can name its lines without counting inside hunks.
+- `post OWNER/REPO NUMBER TAGS.json [--submit]` creates one review from a list of tags, each a path, side, start and end line, tag, optional rank and reason. It checks every line against the diff and refuses the whole review if one is wrong. Without `--submit` the review is pending and only the caller sees it.
+- `drafts OWNER/REPO NUMBER` lists the caller's pending reviews with their tag and non-tag comment counts.
+- `delete OWNER/REPO NUMBER REVIEW_ID` deletes a pending review.
+
+`skills/narrate-pr/SKILL.md` is a Claude Code skill that walks a model through those commands: check for an existing draft, read the diff, decide the tags, post them as a draft unless told to publish, report the review id and the delete command. It carries defaults for the judgement calls and says that the user's own instructions override them. Install it by linking the directory into `~/.claude/skills/`.
+
 ## Posting tags through the API
 
 A review with tag comments is one call. This creates a submitted review that everyone sees:

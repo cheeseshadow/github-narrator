@@ -33,6 +33,16 @@ the parser now skips comments and blank lines
 
 The number after the comma is the file's rank, lower first. Files without a rank keep GitHub's order and come after the ranked ones. Click a label to expand or collapse its block.
 
+## Let a model tag a pull request
+
+`narrate.py` posts tags from a JSON list and checks the line numbers against the diff; it needs only the `gh` CLI. `skills/narrate-pr/SKILL.md` is a Claude Code skill that uses it. Link the skill into your personal skills and ask Claude Code to narrate a pull request:
+
+```bash
+ln -s "$(pwd)/skills/narrate-pr" ~/.claude/skills/narrate-pr
+```
+
+By default the skill creates a pending review that only you see, and tells you how to delete it. Put your own rules about what counts as main or boilerplate, and whether tags may be published, in your project's `CLAUDE.md`.
+
 ## Check that it runs
 
 Open the browser console on a pull request's Files tab. The script prints lines starting with `narrate:`: one when it loads, one per tag comment it finds, and one per block it renders. If the first line is missing, Tampermonkey is not running the script.
