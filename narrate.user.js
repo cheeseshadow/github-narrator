@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
-// @version      0.3.0
+// @version      0.3.1
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
 // @updateURL    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
@@ -114,6 +114,10 @@
     const replies = thread.querySelectorAll('.markdown-body').length > 1;
     const wrapper = thread.closest('[data-inline-markers] > *') || thread;
     wrapper.classList.toggle('narrate-thread-hidden', !replies);
+    const markers = thread.closest('[data-inline-markers]');
+    if (!markers) return;
+    const threadWrappers = [...markers.children].filter((c) => c.querySelector('[data-testid="review-thread"]'));
+    markers.classList.toggle('narrate-thread-hidden', threadWrappers.every((c) => c.classList.contains('narrate-thread-hidden')));
   }
 
   function render(thread, info, rows, collapsed, range) {
