@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
-// @version      0.2.0
+// @version      0.2.1
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
 // @updateURL    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
@@ -23,6 +23,7 @@
   const TOKEN_KEY = 'narrate.token';
   const STATE = Symbol('narrate');
   const ORIGINAL_INDEX = Symbol('narrate-index');
+  const OWNER = Symbol('narrate-owner');
   const DIFF_LIST = '[data-testid="progressive-diffs-list"]';
   const rankByFile = new Map();
   const log = (...args) => console.log('narrate:', ...args);
@@ -165,8 +166,7 @@
     td.append(b, `${info.reason}${info.reason ? ' · ' : ''}${rows.length} lines`);
     state.label.append(td);
     state.label.addEventListener('click', () => setCollapsed(state, !state.collapsed));
-    const stale = rows[0].previousElementSibling;
-    if (stale && stale.classList.contains('narrate-label')) stale.remove();
+    state.label[OWNER] = thread;
     rows[0].before(state.label);
     log('rendered', info.tag, 'over', rows.length, 'rows', range ? 'by range' : 'by hunk');
 
@@ -180,6 +180,15 @@
     if (!state || state.pending) return;
     state.label.remove();
     state.rows.forEach((r) => r.classList.remove('narrate-dim', 'narrate-main', 'narrate-hidden'));
+  }
+
+  function takenByAnother(firstRow, thread) {
+    const label = firstRow.previousElementSibling;
+    if (!label || !label.classList.contains('narrate-label')) return false;
+    const owner = label[OWNER];
+    if (owner !== thread && owner.isConnected && owner[STATE] && intact(owner[STATE])) return true;
+    label.remove();
+    return false;
   }
 
   function intact(state) {
@@ -204,6 +213,10 @@
     const rows = range ? rowsInRange(row, range) : rowsInHunk(row);
     delete thread[STATE];
     if (rows.length === 0 || !row.isConnected) return;
+    if (takenByAnother(rows[0], thread)) {
+      hideThread(thread);
+      return;
+    }
     render(thread, info, rows, state ? state.collapsed : TAGS[info.tag].collapsed, range);
   }
 
