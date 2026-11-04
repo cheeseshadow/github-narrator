@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
-// @version      0.1.1
+// @version      0.1.2
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
 // @updateURL    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
@@ -27,7 +27,10 @@
   const style = document.createElement('style');
   style.textContent = `
     tr.narrate-dim > td { opacity: 0.4; }
+    tr.narrate-main > td { background-color: var(--bgColor-accent-muted, #ddf4ff); }
     tr.narrate-main > td:first-child { box-shadow: inset 4px 0 0 var(--fgColor-accent, #0969da); }
+    tr.narrate-label.narrate-label-main > td { background: var(--bgColor-accent-muted, #ddf4ff); color: var(--fgColor-accent, #0969da); box-shadow: inset 4px 0 0 var(--fgColor-accent, #0969da); }
+    tr.narrate-label.narrate-label-main > td > b { color: var(--fgColor-accent, #0969da); }
     tr.narrate-hidden { display: none; }
     tr.narrate-label > td {
       padding: 2px 12px;
@@ -135,7 +138,7 @@
     }
     setCollapsed(state, collapsed);
 
-    state.label.className = 'narrate-label';
+    state.label.className = `narrate-label narrate-label-${info.tag}`;
     const td = document.createElement('td');
     td.colSpan = 100;
     const b = document.createElement('b');
