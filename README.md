@@ -8,10 +8,11 @@ GitHub shows the files of a pull request in alphabetical order and gives every h
 
 ## How it works
 
-The author tags blocks of the diff with ordinary GitHub review comments. A tag comment starts with `narrate:` followed by a tag name. Everything after the tag name on that line is a free-text reason.
+The author tags blocks of the diff with ordinary GitHub review comments. The first line of a tag comment is `narrate:` followed by a tag name and, optionally, a comma and a rank. Everything from the second line on is the reason.
 
 ```
-narrate: boilerplate generated from the schema
+narrate: boilerplate, 2
+generated from the schema
 ```
 
 The author selects the block by dragging over the line numbers in the Files tab, the way any multi-line review comment is made, and submits all tags as one review so reviewers get one notification.
@@ -24,15 +25,16 @@ Because tags are review comments, GitHub anchors them to the commit and marks th
 
 | Tag | Meaning | Rendering |
 | --- | --- | --- |
-| `main` | The block that carries the decision of the PR. | Expanded and highlighted. |
+| `main` | The block that carries the decision of the PR. | Tinted in the accent colour with an accent bar, expanded. |
 | `boilerplate` | Generated or mechanical code: migrations, lockfiles, snapshots, fields added to a DTO. | Grayed out, collapsed with the reason on the header. |
 | `move` | Code that exists elsewhere unchanged or near-unchanged. The reason names the origin. | Grayed out, collapsed with the reason on the header. |
+| `order` | Carries only a rank. | Nothing. The comment is hidden. |
 
-A comment whose first line does not parse as `narrate: <tag>` is a normal comment and the script leaves it alone.
+A comment whose first line does not parse as `narrate: <tag>` or `narrate: <tag>, <rank>` is a normal comment and the script leaves it alone.
 
 ## File order
 
-Not part of the first version. The planned form is one top-level comment or a block in the PR description starting with `narrate: order`, followed by one path per line.
+A rank is a number after the tag, lower first. A file's rank is the lowest rank among its tag comments. The script sorts the files on the Files tab by rank; files without a rank keep GitHub's order and come after the ranked ones. The sidebar file tree keeps GitHub's order.
 
 ## Userscript
 
@@ -55,6 +57,8 @@ With the token set, the script reads the start and end line of every tag comment
 ### Limits
 
 The Conversation tab still shows tag comments as normal comments. Outdated tag comments are not shown on the Files tab, so their tags disappear until the author re-tags.
+
+In hunk mode two tags inside one hunk compete for the same rows and the last one rendered wins. Expanding context on the Files tab can merge two hunks and cause this. A token avoids it.
 
 ## Status
 

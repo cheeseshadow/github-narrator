@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
-// @version      0.1.3
+// @version      0.2.0
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
 // @updateURL    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
@@ -17,10 +17,14 @@
     main: { collapsed: false },
     boilerplate: { collapsed: true },
     move: { collapsed: true },
+    order: { collapsed: false },
   };
-  const TAG_LINE = /^narrate:\s*([a-z]+)\s*(.*)$/i;
+  const TAG_LINE = /^narrate:\s*([a-z]+)\s*(?:,\s*(\d+))?\s*$/i;
   const TOKEN_KEY = 'narrate.token';
   const STATE = Symbol('narrate');
+  const ORIGINAL_INDEX = Symbol('narrate-index');
+  const DIFF_LIST = '[data-testid="progressive-diffs-list"]';
+  const rankByFile = new Map();
   const log = (...args) => console.log('narrate:', ...args);
   log('script loaded on', location.href);
 
@@ -100,10 +104,15 @@
     const first = thread.querySelector('[data-first-thread-comment="true"]');
     const body = first && first.querySelector('.markdown-body');
     if (!body) return null;
-    const line = body.textContent.trim().split('\n')[0].trim();
-    const m = line.match(TAG_LINE);
+    const lines = body.textContent.trim().split('\n').map((l) => l.trim());
+    const m = lines[0].match(TAG_LINE);
     if (!m || !TAGS[m[1].toLowerCase()]) return null;
-    return { tag: m[1].toLowerCase(), reason: m[2].trim(), commentId: first.id.replace(/^r/, '') };
+    return {
+      tag: m[1].toLowerCase(),
+      rank: m[2] === undefined ? null : Number(m[2]),
+      reason: lines.slice(1).find((l) => l) || '',
+      commentId: first.id.replace(/^r/, ''),
+    };
   }
 
   function isHunkHeader(row) {
@@ -134,6 +143,12 @@
     state.rows.forEach((r) => r.classList.toggle('narrate-hidden', collapsed));
   }
 
+  function hideThread(thread) {
+    const replies = thread.querySelectorAll('.markdown-body').length > 1;
+    const wrapper = thread.closest('[data-inline-markers] > *') || thread;
+    wrapper.classList.toggle('narrate-thread-hidden', !replies);
+  }
+
   function render(thread, info, rows, collapsed, range) {
     const state = { label: document.createElement('tr'), rows, collapsed };
     for (const r of rows) {
@@ -155,9 +170,7 @@
     rows[0].before(state.label);
     log('rendered', info.tag, 'over', rows.length, 'rows', range ? 'by range' : 'by hunk');
 
-    const replies = thread.querySelectorAll('.markdown-body').length > 1;
-    const wrapper = thread.closest('[data-inline-markers] > *') || thread;
-    wrapper.classList.toggle('narrate-thread-hidden', !replies);
+    hideThread(thread);
     thread[STATE] = state;
   }
 
@@ -178,7 +191,11 @@
     if (state && (state.pending || intact(state))) return;
     const info = parseTag(thread);
     if (!info) return;
-    log('tag comment', info.commentId, info.tag, JSON.stringify(info.reason));
+    log('tag comment', info.commentId, info.tag, info.rank, JSON.stringify(info.reason));
+    if (info.tag === 'order') {
+      hideThread(thread);
+      return;
+    }
     const row = thread.closest('tr');
     if (!row) return;
     if (state) clear(thread);
@@ -188,6 +205,35 @@
     delete thread[STATE];
     if (rows.length === 0 || !row.isConnected) return;
     render(thread, info, rows, state ? state.collapsed : TAGS[info.tag].collapsed, range);
+  }
+
+  function fileKey(entry) {
+    const pr = prKey();
+    const diff = entry.querySelector('[id^="diff-"]');
+    return pr && diff ? `${pr.key}:${diff.id}` : null;
+  }
+
+  function reorder(threads) {
+    for (const thread of threads) {
+      const info = parseTag(thread);
+      const entry = thread.closest(`${DIFF_LIST} > *`);
+      const key = entry && fileKey(entry);
+      if (!info || info.rank === null || !key) continue;
+      rankByFile.set(key, Math.min(info.rank, rankByFile.get(key) ?? Infinity));
+    }
+    const list = document.querySelector(DIFF_LIST);
+    if (!list) return;
+    const entries = [...list.children].filter((e) => e.tagName === 'DIV' && e.querySelector('[id^="diff-"]'));
+    const rank = (e) => rankByFile.get(fileKey(e)) ?? Infinity;
+    if (!entries.some((e) => rank(e) !== Infinity)) return;
+    entries.forEach((e, i) => { e[ORIGINAL_INDEX] ??= i; });
+    const sorted = [...entries].sort((a, b) => rank(a) - rank(b) || a[ORIGINAL_INDEX] - b[ORIGINAL_INDEX]);
+    sorted.forEach((e, i) => {
+      if (list.children[i] !== e) {
+        list.insertBefore(e, list.children[i] || null);
+        log('moved', e.querySelector('[id^="diff-"]').id.slice(0, 13), 'to position', i);
+      }
+    });
   }
 
   let pending = false;
@@ -201,6 +247,7 @@
       if (threads.length !== lastCount) log('pass over', threads.length, 'review threads');
       lastCount = threads.length;
       threads.forEach(apply);
+      reorder(threads);
     }, 150);
   }
 
