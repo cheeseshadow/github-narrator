@@ -44,21 +44,13 @@ For every tag comment the script hides the comment thread, unless someone replie
 
 ### Which rows a tag covers
 
-GitHub's page does not say where a multi-line comment starts, so without API access the script applies the tag to the whole hunk that contains the comment. The hunk is the block between two `@@` headers.
-
-To get exact ranges, create a fine-grained personal access token with read access to pull requests on the repositories you review, and store it once in the browser console on github.com:
-
-```
-localStorage.setItem('narrate.token', '<token>')
-```
-
-With the token set, the script reads the start and end line of every tag comment from the GitHub API and covers exactly the lines the author selected.
+GitHub shows the line range of every review comment in a heading above the thread, such as "Comment on lines R13 to R14". The script reads that heading, so a tag covers exactly the lines the author selected. If the heading is missing, the script falls back to the whole hunk that contains the comment, the block between two `@@` headers.
 
 ### Limits
 
 The Conversation tab still shows tag comments as normal comments. Outdated tag comments are not shown on the Files tab, so their tags disappear until the author re-tags.
 
-In hunk mode two tags inside one hunk compete for the same rows and the last one rendered wins. Expanding context on the Files tab can merge two hunks and cause this. A token avoids it.
+When two tags start on the same row, the first one rendered keeps the block and the others only hide their comment.
 
 ## Status
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
-// @version      0.2.1
+// @version      0.3.0
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
 // @updateURL    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
@@ -20,7 +20,6 @@
     order: { collapsed: false },
   };
   const TAG_LINE = /^narrate:\s*([a-z]+)\s*(?:,\s*(\d+))?\s*$/i;
-  const TOKEN_KEY = 'narrate.token';
   const STATE = Symbol('narrate');
   const ORIGINAL_INDEX = Symbol('narrate-index');
   const OWNER = Symbol('narrate-owner');
@@ -54,51 +53,18 @@
   `;
   document.head.append(style);
 
-  let rangesPromise = null;
-  let rangesFor = null;
-
   function prKey() {
     const m = location.pathname.match(/^\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
-    return m ? { owner: m[1], repo: m[2], number: m[3], key: m[0] } : null;
+    return m ? { key: m[0] } : null;
   }
 
-  async function fetchRanges(pr) {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      log('no token in localStorage, tags cover whole hunks');
-      return {};
-    }
-    const ranges = {};
-    for (let page = 1; page < 20; page++) {
-      const url = `https://api.github.com/repos/${pr.owner}/${pr.repo}/pulls/${pr.number}/comments?per_page=100&page=${page}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });
-      if (!res.ok) {
-        console.warn('narrate: comment fetch failed', res.status);
-        return ranges;
-      }
-      const comments = await res.json();
-      log('fetched', comments.length, 'comments from the API');
-      for (const c of comments) {
-        if (c.line == null) continue;
-        ranges[c.id] = { side: c.side.toLowerCase(), start: c.start_line ?? c.line, end: c.line };
-      }
-      if (comments.length < 100) break;
-    }
-    return ranges;
-  }
-
-  function ranges() {
-    const pr = prKey();
-    if (!pr) return Promise.resolve({});
-    if (rangesFor !== pr.key) {
-      rangesFor = pr.key;
-      rangesPromise = fetchRanges(pr).then((r) => {
-        document.querySelectorAll('[data-testid="review-thread"]').forEach(clear);
-        schedule();
-        return r;
-      });
-    }
-    return rangesPromise;
+  function rangeFromHeading(thread) {
+    const wrapper = thread.closest('[data-inline-markers] > *');
+    const heading = wrapper && wrapper.querySelector('h2');
+    if (!heading) return null;
+    const refs = [...heading.querySelectorAll('span')].map((e) => e.textContent.trim().match(/^([LR])(\d+)$/)).filter(Boolean);
+    if (refs.length === 0) return null;
+    return { side: refs[0][1] === 'L' ? 'left' : 'right', start: Number(refs[0][2]), end: Number(refs[refs.length - 1][2]) };
   }
 
   function parseTag(thread) {
@@ -177,7 +143,7 @@
   function clear(thread) {
     const state = thread[STATE];
     delete thread[STATE];
-    if (!state || state.pending) return;
+    if (!state) return;
     state.label.remove();
     state.rows.forEach((r) => r.classList.remove('narrate-dim', 'narrate-main', 'narrate-hidden'));
   }
@@ -195,9 +161,9 @@
     return state.label.isConnected && state.rows.every((r) => r.isConnected);
   }
 
-  async function apply(thread) {
+  function apply(thread) {
     const state = thread[STATE];
-    if (state && (state.pending || intact(state))) return;
+    if (state && intact(state)) return;
     const info = parseTag(thread);
     if (!info) return;
     log('tag comment', info.commentId, info.tag, info.rank, JSON.stringify(info.reason));
@@ -208,11 +174,9 @@
     const row = thread.closest('tr');
     if (!row) return;
     if (state) clear(thread);
-    thread[STATE] = { pending: true };
-    const range = (await ranges())[info.commentId];
+    const range = rangeFromHeading(thread);
     const rows = range ? rowsInRange(row, range) : rowsInHunk(row);
-    delete thread[STATE];
-    if (rows.length === 0 || !row.isConnected) return;
+    if (rows.length === 0) return;
     if (takenByAnother(rows[0], thread)) {
       hideThread(thread);
       return;
