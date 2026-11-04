@@ -1,9 +1,11 @@
 // ==UserScript==
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
-// @version      0.1.0
+// @version      0.1.1
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
+// @updateURL    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
+// @downloadURL  https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -19,6 +21,8 @@
   const TAG_LINE = /^narrate:\s*([a-z]+)\s*(.*)$/i;
   const TOKEN_KEY = 'narrate.token';
   const STATE = Symbol('narrate');
+  const log = (...args) => console.log('narrate:', ...args);
+  log('script loaded on', location.href);
 
   const style = document.createElement('style');
   style.textContent = `
@@ -48,7 +52,10 @@
 
   async function fetchRanges(pr) {
     const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return {};
+    if (!token) {
+      log('no token in localStorage, tags cover whole hunks');
+      return {};
+    }
     const ranges = {};
     for (let page = 1; page < 20; page++) {
       const url = `https://api.github.com/repos/${pr.owner}/${pr.repo}/pulls/${pr.number}/comments?per_page=100&page=${page}`;
@@ -58,6 +65,7 @@
         return ranges;
       }
       const comments = await res.json();
+      log('fetched', comments.length, 'comments from the API');
       for (const c of comments) {
         if (c.line == null) continue;
         ranges[c.id] = { side: c.side.toLowerCase(), start: c.start_line ?? c.line, end: c.line };
@@ -119,7 +127,7 @@
     state.rows.forEach((r) => r.classList.toggle('narrate-hidden', collapsed));
   }
 
-  function render(thread, info, rows, collapsed) {
+  function render(thread, info, rows, collapsed, range) {
     const state = { label: document.createElement('tr'), rows, collapsed };
     for (const r of rows) {
       r.classList.toggle('narrate-dim', info.tag !== 'main');
@@ -138,6 +146,7 @@
     const stale = rows[0].previousElementSibling;
     if (stale && stale.classList.contains('narrate-label')) stale.remove();
     rows[0].before(state.label);
+    log('rendered', info.tag, 'over', rows.length, 'rows', range ? 'by range' : 'by hunk');
 
     const replies = thread.querySelectorAll('.markdown-body').length > 1;
     const wrapper = thread.closest('[data-inline-markers] > *') || thread;
@@ -162,6 +171,7 @@
     if (state && (state.pending || intact(state))) return;
     const info = parseTag(thread);
     if (!info) return;
+    log('tag comment', info.commentId, info.tag, JSON.stringify(info.reason));
     const row = thread.closest('tr');
     if (!row) return;
     if (state) clear(thread);
@@ -170,16 +180,20 @@
     const rows = range ? rowsInRange(row, range) : rowsInHunk(row);
     delete thread[STATE];
     if (rows.length === 0 || !row.isConnected) return;
-    render(thread, info, rows, state ? state.collapsed : TAGS[info.tag].collapsed);
+    render(thread, info, rows, state ? state.collapsed : TAGS[info.tag].collapsed, range);
   }
 
   let pending = false;
+  let lastCount = -1;
   function schedule() {
     if (pending) return;
     pending = true;
     setTimeout(() => {
       pending = false;
-      document.querySelectorAll('[data-testid="review-thread"]').forEach(apply);
+      const threads = document.querySelectorAll('[data-testid="review-thread"]');
+      if (threads.length !== lastCount) log('pass over', threads.length, 'review threads');
+      lastCount = threads.length;
+      threads.forEach(apply);
     }, 150);
   }
 
