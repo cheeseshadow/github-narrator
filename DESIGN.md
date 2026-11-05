@@ -48,8 +48,8 @@ A comment whose first line does not match the pattern is a normal comment and th
 | Tag | Meaning | Rendering | Collapsed by default |
 | --- | --- | --- | --- |
 | `main` | The block that carries the decision of the pull request. | Every row tinted in GitHub's accent colour, blended with the addition and deletion colours, with an accent bar on the left. The label is drawn in the accent colour. | No |
-| `boilerplate` | Generated or mechanical code: migrations, lockfiles, snapshots, fields added to a data object. | Rows dimmed to 40% opacity. | Yes |
-| `move` | Code that exists elsewhere unchanged or near-unchanged. The reason names the other place. | Rows dimmed to 40% opacity. | Yes |
+| `boilerplate` | Generated or mechanical code: migrations, lockfiles, snapshots, fields added to a data object. | Rows drawn in gray: GitHub's muted background and muted text in place of the addition and deletion colours, with a gray bar on the left. | No |
+| `move` | Code that exists elsewhere unchanged or near-unchanged. The reason names the other place. | The same gray rendering as `boilerplate`. | No |
 | `order` | Carries only a rank. | Nothing. The comment is hidden. | Not applicable |
 
 ### Rank and file order
@@ -68,7 +68,7 @@ For every review thread whose first comment is a tag comment:
 
 - The thread is hidden, together with the container GitHub draws around it, unless someone replied to it. A thread with replies stays visible so the discussion is not lost.
 - The rows the comment covers get the tag's rendering. The covered rows are exactly the lines in the heading GitHub shows above the thread, "Comment on lines R13 to R14" or "Comment on line L22". If that heading is missing, the script falls back to the whole hunk that contains the comment, the block between two `@@` headers.
-- A label row is inserted before the first covered row. It shows the tag, the first line of the reason and the number of rows. Clicking the label collapses or expands the rows. Blocks tagged `boilerplate` or `move` start collapsed.
+- A label row is inserted before the first covered row. It shows the tag, the first line of the reason and the number of rows. Clicking the label collapses or expands the rows. Every block starts expanded: a collapsed block hides what the reviewer scrolls past and makes the diff hard to follow, so dimming is the default and collapsing is the reviewer's choice.
 - When two tags start on the same row, the first one rendered keeps the block and the later ones only hide their comment.
 
 Files are reordered by rank as described above. The sidebar file tree keeps GitHub's order.

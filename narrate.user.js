@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
-// @version      0.3.2
+// @version      0.4.0
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
 // @updateURL    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
@@ -15,8 +15,8 @@
 
   const TAGS = {
     main: { collapsed: false },
-    boilerplate: { collapsed: true },
-    move: { collapsed: true },
+    boilerplate: { collapsed: false },
+    move: { collapsed: false },
     order: { collapsed: false },
   };
   const TAG_LINE = /^narrate:\s*([a-z]+)\s*(?:,\s*(\d+))?\s*$/i;
@@ -30,7 +30,9 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    tr[data-narrate="dim"] > td { opacity: 0.4; }
+    tr[data-narrate="dim"] > td { background-color: var(--bgColor-muted, #f6f8fa) !important; color: var(--fgColor-muted, #59636e) !important; opacity: 0.75; }
+    tr[data-narrate="dim"] > td code, tr[data-narrate="dim"] > td code * { color: var(--fgColor-muted, #59636e) !important; }
+    tr[data-narrate="dim"] > td:first-child { box-shadow: inset 4px 0 0 var(--borderColor-muted, #d1d9e0); }
     tr[data-narrate="main"] > td { background-color: var(--bgColor-accent-muted, #ddf4ff) !important; }
     tr[data-narrate="main"] > td:has(> code.addition) { background-color: color-mix(in srgb, var(--bgColor-accent-muted, #ddf4ff) 50%, var(--diffBlob-additionLine-bgColor, var(--diffBlob-addition-bgColor-line))) !important; }
     tr[data-narrate="main"] > td:has(> code.deletion) { background-color: color-mix(in srgb, var(--bgColor-accent-muted, #ddf4ff) 50%, var(--diffBlob-deletionLine-bgColor, var(--diffBlob-deletion-bgColor-line))) !important; }

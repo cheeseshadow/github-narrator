@@ -27,11 +27,11 @@ the parser now skips comments and blank lines
 | Tag | Use it for | The script shows |
 | --- | --- | --- |
 | `main` | The change that carries the decision. | The block tinted and expanded. |
-| `boilerplate` | Generated or mechanical code. | The block dimmed and collapsed under a one-line label. |
-| `move` | Code moved from or to another place. Name it in the reason. | The block dimmed and collapsed under a one-line label. |
+| `boilerplate` | Generated or mechanical code. | The block in gray under a one-line label. |
+| `move` | Code moved from or to another place. Name it in the reason. | The block in gray under a one-line label. |
 | `order` | A file that needs a rank and no tag. | Nothing. |
 
-The number after the comma is the file's rank, lower first. Files without a rank keep GitHub's order and come after the ranked ones. Click a label to expand or collapse its block.
+The number after the comma is the file's rank, lower first. Files without a rank keep GitHub's order and come after the ranked ones. Click a label to collapse or expand its block.
 
 ## Let a model tag a pull request
 
