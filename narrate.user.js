@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
-// @version      0.4.0
+// @version      0.4.1
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
 // @updateURL    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
@@ -31,6 +31,10 @@
   const style = document.createElement('style');
   style.textContent = `
     tr[data-narrate="dim"] > td { background-color: var(--bgColor-muted, #f6f8fa) !important; color: var(--fgColor-muted, #59636e) !important; opacity: 0.75; }
+    tr[data-narrate="dim"] > td:has(> code.addition) { background-color: color-mix(in srgb, var(--bgColor-muted, #f6f8fa) 70%, var(--diffBlob-additionLine-bgColor, var(--diffBlob-addition-bgColor-line))) !important; }
+    tr[data-narrate="dim"] > td:has(> code.deletion) { background-color: color-mix(in srgb, var(--bgColor-muted, #f6f8fa) 70%, var(--diffBlob-deletionLine-bgColor, var(--diffBlob-deletion-bgColor-line))) !important; }
+    tr[data-narrate="dim"]:has(code.addition) > td:not(.diff-text-cell) { background-color: color-mix(in srgb, var(--bgColor-muted, #f6f8fa) 70%, var(--diffBlob-additionNum-bgColor, var(--diffBlob-addition-bgColor-num))) !important; }
+    tr[data-narrate="dim"]:has(code.deletion) > td:not(.diff-text-cell) { background-color: color-mix(in srgb, var(--bgColor-muted, #f6f8fa) 70%, var(--diffBlob-deletionNum-bgColor, var(--diffBlob-deletion-bgColor-num))) !important; }
     tr[data-narrate="dim"] > td code, tr[data-narrate="dim"] > td code * { color: var(--fgColor-muted, #59636e) !important; }
     tr[data-narrate="dim"] > td:first-child { box-shadow: inset 4px 0 0 var(--borderColor-muted, #d1d9e0); }
     tr[data-narrate="main"] > td { background-color: var(--bgColor-accent-muted, #ddf4ff) !important; }

@@ -48,7 +48,7 @@ A comment whose first line does not match the pattern is a normal comment and th
 | Tag | Meaning | Rendering | Collapsed by default |
 | --- | --- | --- | --- |
 | `main` | The block that carries the decision of the pull request. | Every row tinted in GitHub's accent colour, blended with the addition and deletion colours, with an accent bar on the left. The label is drawn in the accent colour. | No |
-| `boilerplate` | Generated or mechanical code: migrations, lockfiles, snapshots, fields added to a data object. | Rows drawn in gray: GitHub's muted background and muted text in place of the addition and deletion colours, with a gray bar on the left. | No |
+| `boilerplate` | Generated or mechanical code: migrations, lockfiles, snapshots, fields added to a data object. | Rows drawn in gray: GitHub's muted background blended at 70% with the addition and deletion colours, so a faint green or red remains, muted text, and a gray bar on the left. | No |
 | `move` | Code that exists elsewhere unchanged or near-unchanged. The reason names the other place. | The same gray rendering as `boilerplate`. | No |
 | `order` | Carries only a rank. | Nothing. The comment is hidden. | Not applicable |
 
