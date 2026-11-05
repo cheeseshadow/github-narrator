@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
-// @version      0.4.1
+// @version      0.5.0
 // @license      MIT
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
@@ -15,17 +15,19 @@
   'use strict';
 
   const TAGS = {
-    main: { collapsed: false },
-    boilerplate: { collapsed: false },
-    move: { collapsed: false },
-    order: { collapsed: false },
+    main: { folded: false },
+    boilerplate: { folded: true },
+    move: { folded: true },
+    order: { folded: false },
   };
+  const MIN_FOLD_ROWS = 5;
   const TAG_LINE = /^narrate:\s*([a-z]+)\s*(?:,\s*(\d+))?\s*$/i;
   const STATE = Symbol('narrate');
   const ORIGINAL_INDEX = Symbol('narrate-index');
   const OWNER = Symbol('narrate-owner');
   const DIFF_LIST = '[data-testid="progressive-diffs-list"]';
   const rankByFile = new Map();
+  const foldedByComment = new Map();
   const log = (...args) => console.log('narrate:', ...args);
   log('script loaded on', location.href);
 
@@ -46,15 +48,17 @@
     tr[data-narrate="main"] > td:first-child { box-shadow: inset 4px 0 0 var(--fgColor-accent, #0969da); }
     tr.narrate-label.narrate-label-main > td { background: var(--bgColor-accent-muted, #ddf4ff); color: var(--fgColor-accent, #0969da); box-shadow: inset 4px 0 0 var(--fgColor-accent, #0969da); }
     tr.narrate-label.narrate-label-main > td > b { color: var(--fgColor-accent, #0969da); }
-    tr[data-narrate-collapsed] { display: none; }
-    tr.narrate-label > td {
+    tr[data-narrate-folded] { display: none; }
+    tr.narrate-label > td, tr.narrate-gap > td {
       padding: 2px 12px;
       font: 12px var(--fontStack-sansSerif, sans-serif);
       color: var(--fgColor-muted, #59636e);
       background: var(--bgColor-muted, #f6f8fa);
-      cursor: pointer;
       user-select: none;
     }
+    tr.narrate-foldable > td { cursor: pointer; }
+    tr.narrate-gap > td { font-style: italic; box-shadow: inset 4px 0 0 var(--borderColor-muted, #d1d9e0); }
+    tr.narrate-gap.narrate-gap-main > td { box-shadow: inset 4px 0 0 var(--fgColor-accent, #0969da); }
     tr.narrate-label > td > b { color: var(--fgColor-default, #1f2328); margin-right: 6px; }
     [data-narrate-thread-hidden] { display: none !important; }
   `;
@@ -98,7 +102,7 @@
     while (r.previousElementSibling && !isHunkHeader(r.previousElementSibling)) r = r.previousElementSibling;
     const rows = [];
     for (; r && !isHunkHeader(r); r = r.nextElementSibling) {
-      if (!r.classList.contains('narrate-label')) rows.push(r);
+      if (!r.classList.contains('narrate-label') && !r.classList.contains('narrate-gap')) rows.push(r);
     }
     return rows;
   }
@@ -112,9 +116,26 @@
     );
   }
 
-  function setCollapsed(state, collapsed) {
-    state.collapsed = collapsed;
-    state.rows.forEach((r) => r.toggleAttribute('data-narrate-collapsed', collapsed));
+  function setFolded(state, folded) {
+    state.folded = folded;
+    const last = state.rows.length - 1;
+    state.rows.forEach((r, i) => r.toggleAttribute('data-narrate-folded', folded && i > 0 && i < last));
+    if (state.gap) state.gap.hidden = !folded;
+  }
+
+  function toggle(state, commentId) {
+    setFolded(state, !state.folded);
+    foldedByComment.set(commentId, state.folded);
+  }
+
+  function gapRow(tag, hiddenCount) {
+    const row = document.createElement('tr');
+    row.className = `narrate-gap narrate-gap-${tag}`;
+    const td = document.createElement('td');
+    td.colSpan = 100;
+    td.textContent = `⋯ ${hiddenCount} lines folded`;
+    row.append(td);
+    return row;
   }
 
   function hideThread(thread) {
@@ -127,10 +148,9 @@
     markers.toggleAttribute('data-narrate-thread-hidden', threadWrappers.every((c) => c.hasAttribute('data-narrate-thread-hidden')));
   }
 
-  function render(thread, info, rows, collapsed, range) {
-    const state = { label: document.createElement('tr'), rows, collapsed };
+  function render(thread, info, rows, folded, range) {
+    const state = { label: document.createElement('tr'), gap: null, rows, folded: false };
     for (const r of rows) r.dataset.narrate = info.tag === 'main' ? 'main' : 'dim';
-    setCollapsed(state, collapsed);
 
     state.label.className = `narrate-label narrate-label-${info.tag}`;
     const td = document.createElement('td');
@@ -139,10 +159,19 @@
     b.textContent = info.tag;
     td.append(b, `${info.reason}${info.reason ? ' · ' : ''}${rows.length} lines`);
     state.label.append(td);
-    state.label.addEventListener('click', () => setCollapsed(state, !state.collapsed));
     state.label[OWNER] = thread;
     rows[0].before(state.label);
-    log('rendered', info.tag, 'over', rows.length, 'rows', range ? 'by range' : 'by hunk');
+
+    if (rows.length >= MIN_FOLD_ROWS) {
+      state.gap = gapRow(info.tag, rows.length - 2);
+      rows[0].after(state.gap);
+      for (const row of [state.label, state.gap]) {
+        row.classList.add('narrate-foldable');
+        row.addEventListener('click', () => toggle(state, info.commentId));
+      }
+      setFolded(state, folded);
+    }
+    log('rendered', info.tag, 'over', rows.length, 'rows', range ? 'by range' : 'by hunk', state.folded ? 'folded' : 'expanded');
 
     hideThread(thread);
     thread[STATE] = state;
@@ -153,9 +182,10 @@
     delete thread[STATE];
     if (!state) return;
     state.label.remove();
+    if (state.gap) state.gap.remove();
     state.rows.forEach((r) => {
       delete r.dataset.narrate;
-      r.removeAttribute('data-narrate-collapsed');
+      r.removeAttribute('data-narrate-folded');
     });
   }
 
@@ -165,11 +195,12 @@
     const owner = label[OWNER];
     if (owner !== thread && owner.isConnected && owner[STATE] && intact(owner[STATE])) return true;
     label.remove();
+    if (owner && owner[STATE] && owner[STATE].gap) owner[STATE].gap.remove();
     return false;
   }
 
   function intact(state) {
-    return state.label.isConnected && state.rows.every((r) => r.isConnected);
+    return state.label.isConnected && (!state.gap || state.gap.isConnected) && state.rows.every((r) => r.isConnected);
   }
 
   function apply(thread) {
@@ -192,7 +223,7 @@
       hideThread(thread);
       return;
     }
-    render(thread, info, rows, state ? state.collapsed : TAGS[info.tag].collapsed, range);
+    render(thread, info, rows, foldedByComment.get(info.commentId) ?? TAGS[info.tag].folded, range);
   }
 
   function fileKey(entry) {
