@@ -2,7 +2,11 @@
 
 A way for the author of a pull request to tell reviewers which parts of the diff matter, and a userscript that renders those marks on GitHub's Files tab. The marks are ordinary review comments, so they help reviewers with or without the script.
 
+The author tags blocks of the diff as `main`, `boilerplate` or `move` and gives files a rank. The script tints the main change, grays the boilerplate and moved blocks, hides the tag comments and sorts the files by rank. A model can post the tags too, as a draft review that only the reviewer sees.
+
 [DESIGN.md](DESIGN.md) holds the full description: the reasons, the convention, the behaviour of the script and the API recipe for posting tags from a tool.
+
+The project is early. It is tested by hand on GitHub's current React-based Files tab, in Chrome with Tampermonkey, on small pull requests. Open issues list what is known not to work.
 
 ## Install
 
@@ -13,7 +17,7 @@ A way for the author of a pull request to tell reviewers which parts of the diff
    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
    ```
 
-The repository is private, so Tampermonkey's automatic update check cannot fetch it. To update, open the same URL again.
+Tampermonkey checks that URL for new versions on its own schedule. To update at once, open the URL again.
 
 ## Tag a pull request
 
