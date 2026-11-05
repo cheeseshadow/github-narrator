@@ -4,7 +4,7 @@ This file is the current understanding of the project: what it is, why it exists
 
 ## What it is
 
-GitHub Narrator is a convention plus a browser userscript. The convention lets the author of a pull request, or a tool acting for a reviewer, mark blocks of the diff with a tag: this block is the main change, this block is boilerplate, this block was moved. The userscript reads those marks on GitHub's Files tab and renders the diff accordingly: the main change stands out, the rest is dimmed or collapsed, and the files appear in the order the author chose.
+GitHub Narrator is a convention plus a browser userscript. The convention lets the author of a pull request, or a tool acting for a reviewer, mark blocks of the diff with a tag: this block is the main change, this block is boilerplate, this block was moved. The userscript reads those marks on GitHub's Files tab and renders the diff accordingly: the main change stands out, the rest is dimmed or folded, and the files appear in the order the author chose.
 
 ## Why
 
@@ -45,11 +45,11 @@ A comment whose first line does not match the pattern is a normal comment and th
 
 ### Tags
 
-| Tag | Meaning | Rendering | Collapsed by default |
+| Tag | Meaning | Rendering | Folded by default |
 | --- | --- | --- | --- |
 | `main` | The block that carries the decision of the pull request. | Every row tinted in GitHub's accent colour, blended with the addition and deletion colours, with an accent bar on the left. The label is drawn in the accent colour. | No |
-| `boilerplate` | Generated or mechanical code: migrations, lockfiles, snapshots, fields added to a data object. | Rows drawn in gray: GitHub's muted background blended at 70% with the addition and deletion colours, so a faint green or red remains, muted text, and a gray bar on the left. | No |
-| `move` | Code that exists elsewhere unchanged or near-unchanged. The reason names the other place. | The same gray rendering as `boilerplate`. | No |
+| `boilerplate` | Generated or mechanical code: migrations, lockfiles, snapshots, fields added to a data object. | Rows drawn in gray: GitHub's muted background blended at 70% with the addition and deletion colours, so a faint green or red remains, muted text, and a gray bar on the left. | Yes |
+| `move` | Code that exists elsewhere unchanged or near-unchanged. The reason names the other place. | The same gray rendering as `boilerplate`. | Yes |
 | `order` | Carries only a rank. | Nothing. The comment is hidden. | Not applicable |
 
 ### Rank and file order
@@ -68,7 +68,9 @@ For every review thread whose first comment is a tag comment:
 
 - The thread is hidden, together with the container GitHub draws around it, unless someone replied to it. A thread with replies stays visible so the discussion is not lost.
 - The rows the comment covers get the tag's rendering. The covered rows are exactly the lines in the heading GitHub shows above the thread, "Comment on lines R13 to R14" or "Comment on line L22". If that heading is missing, the script falls back to the whole hunk that contains the comment, the block between two `@@` headers.
-- A label row is inserted before the first covered row. It shows the tag, the first line of the reason and the number of rows. Clicking the label collapses or expands the rows. Every block starts expanded: a collapsed block hides what the reviewer scrolls past and makes the diff hard to follow, so dimming is the default and collapsing is the reviewer's choice.
+- A label row is inserted before the first covered row. It shows the tag, the first line of the reason and the number of rows.
+- A block of five or more rows can be folded. A folded block shows its first and last row with a gap row between them that says how many rows are folded, so the reviewer still sees where the block is and what shape it has, for example a function signature and its closing line. Clicking the label folds or unfolds the block, and clicking the gap row unfolds it. `boilerplate` and `move` blocks start folded and `main` blocks start expanded. A block of fewer than five rows is always shown in full, because folding it would hide one or two rows and add a gap row.
+- GitHub draws a range comment's thread inside the row of the range's last line. A folded block keeps that row on screen, so a thread with replies stays visible.
 - When two tags start on the same row, the first one rendered keeps the block and the later ones only hide their comment.
 
 Files are reordered by rank as described above. The sidebar file tree keeps GitHub's order.
@@ -77,11 +79,12 @@ Pending review comments, the ones in a draft review that only its author sees, u
 
 ### Surviving GitHub's re-renders
 
-GitHub's page is a React application that re-creates rows, threads and their containers when the user expands context, collapses a file, focuses a thread or scrolls on large pull requests. The script must keep working through all of these, so it follows three rules:
+GitHub's page is a React application that re-creates rows, threads and their containers when the user expands context, collapses a file, focuses a thread or scrolls on large pull requests. The script must keep working through all of these, so it follows four rules:
 
-- It never marks a thread as done. On every DOM change, after a short delay, it walks every thread, checks that its label row and its covered rows are still in the document, and re-renders the ones that are not. The collapsed state is carried over.
-- Every mark it puts on an element GitHub owns is a data attribute, never a class. React rewrites an element's whole class list whenever the classes it manages change, and the markers container gets a new class when a thread is focused. React leaves attributes it does not know about alone. The attributes are `data-narrate="main"` or `"dim"` and `data-narrate-collapsed` on rows, and `data-narrate-thread-hidden` on the thread wrapper and its container.
+- It never marks a thread as done. On every DOM change, after a short delay, it walks every thread, checks that its label row and its covered rows are still in the document, and re-renders the ones that are not.
+- Every mark it puts on an element GitHub owns is a data attribute, never a class. React rewrites an element's whole class list whenever the classes it manages change, and the markers container gets a new class when a thread is focused. React leaves attributes it does not know about alone. The attributes are `data-narrate="main"` or `"dim"` and `data-narrate-folded` on rows, and `data-narrate-thread-hidden` on the thread wrapper and its container.
 - A file's rank is remembered for the rest of the page's life, keyed by pull request and file, because collapsing a file removes its rows and threads from the DOM and the file must keep its place.
+- A block's fold state is remembered for the rest of the page's life, keyed by its tag comment, for the same reason. Without it, a block the reviewer unfolded would fold again whenever GitHub re-creates its thread.
 
 ## Tooling for posting tags
 
@@ -124,11 +127,11 @@ Whose account posts matters. Tags posted with a person's token look like that pe
 
 - The Conversation tab shows tag comments as normal comments. Not a priority.
 - Outdated tag comments are hidden by GitHub on the Files tab, so their tags disappear until the author re-tags.
-- A reply to a tag comment keeps the thread visible, but the row holding it may be inside a collapsed block. Tracked in issue 2.
+- A reply to a tag comment keeps the thread visible. When the comment has no line heading and the script falls back to the whole hunk, the row holding the thread may be inside the folded part of the block. Tracked in issue 2.
 - On large pull requests GitHub virtualizes the diff list and may undo the reordering. Tracked in issue 3. Tags are unaffected.
 - The sidebar file tree is not reordered.
 - The script is a Tampermonkey userscript. It becomes a browser extension when distribution to more than a few people needs it; the code needs no change for that beyond the manifest.
 
 ## Test pull request
 
-Pull request 1 in this repository carries one tag of each kind on a small Python change and is the manual test for the script: a two-line `main` block, a `move` on deleted lines and on their new home, a 25-line `boilerplate` file, and ranks that reverse GitHub's alphabetical order.
+Pull request 1 in this repository carries one tag of each kind on a small Python change and is the manual test for the script: a two-line `main` block, a `move` on deleted lines and on their new home, a four-line `boilerplate` block that stays expanded because it is under the fold threshold, a 25-line `boilerplate` file that starts folded, and ranks that reverse GitHub's alphabetical order.
