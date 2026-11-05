@@ -2,6 +2,7 @@
 // @name         GitHub Narrator
 // @namespace    https://github.com/cheeseshadow/github-narrator
 // @version      0.4.1
+// @license      MIT
 // @description  Renders "narrate:" review comments as block tags on the GitHub pull request Files tab.
 // @match        https://github.com/*/pull/*
 // @updateURL    https://github.com/cheeseshadow/github-narrator/raw/main/narrate.user.js
